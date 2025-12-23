@@ -1,17 +1,10 @@
 from pydantic import BaseModel
 from typing import Any, Dict, List, Literal, Union
 
-ToolName = Literal[
-    "suma",
-    "tavily",
-    "wikipedia",
-    "concat_words",
-    "repeat_word",
-]
 
 class PlanStep(BaseModel):
-    tool: ToolName
-    args: Union[str, Dict[str, Any]]
+    task: str          # intención en lenguaje natural
+    input: str         # texto concreto de esa tarea
 
 class ExecutionPlan(BaseModel):
     steps: List[PlanStep]

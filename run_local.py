@@ -8,7 +8,7 @@ from graph.state import AgentState
 print("API KEY LOADED:", os.getenv("OPENAI_API_KEY") is not None)
 
 initial_state: AgentState = {
-    "user_input": "Repite la palabra hola 4 veces y despues suma cuanto es 5+4",
+    "user_input": '¿Puedes decirme cuánto es cinco más nueve?',
     "plan": None,
     "results": [],
     "final_answer": None

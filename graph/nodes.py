@@ -9,11 +9,10 @@ from graph.bigTools_registry import bigtools
 
 
 def planner_node(state):
-    print("antes planer_node ")
+    print("antes planner_node")
     print(state)
-    user_input = state["user_input"]
 
-    tools_description = build_tools_description(bigtools)
+    user_input = state["user_input"]
 
     planner_llm = llm.with_structured_output(
         ExecutionPlan,
@@ -21,23 +20,27 @@ def planner_node(state):
     )
 
     plan = planner_llm.invoke(f"""
-You are a planner.
+    You are a TASK DECOMPOSER for a tool-based system.
 
-Available tools:
-{tools_description}
+    Your job is to split the user request into the MINIMUM number of
+    EXECUTABLE tasks.
 
-Rules:
-- Choose the correct tool
-- args MUST match the argument schema EXACTLY
-- Return JSON only
+    Definition:
+    - A task MUST be solvable by calling exactly ONE tool.
+    - Do NOT split into reasoning steps.
+    - Do NOT include internal thinking steps.
+    - Do NOT include "identify", "analyze", "return" steps.
 
-User request:
-{user_input}
-""")
+    Each task must be something that a single function could execute.
 
-    print("PLAN PARSED OK:", plan)
-    print("despues plan_node")
-    print(state)
+    Return JSON only.
+
+    User request:
+    {user_input}
+    """)
+
+    print("PLAN PARSED OK")
+    print(plan)
 
     return {
         "plan": plan.steps,
@@ -50,6 +53,7 @@ User request:
 def executor_node(state):
     print("antes executor_node")
     print(state)
+
     plan = state["plan"]
     i = state["step_index"]
 
@@ -57,28 +61,31 @@ def executor_node(state):
         return {"done": True}
 
     step = plan[i]
-    tool_wrapper = bigtool_router.get_tool_by_name(step.tool)
 
-    raw_args = step.args
+    semantic_text = f"{step.task}. {step.input}"
 
-    if isinstance(raw_args, str):
-        try:
-            tool_args = json.loads(raw_args)
-        except json.JSONDecodeError:
-            tool_args = raw_args
+    selected_tool = bigtool_router.select_tool(semantic_text)
+    print("tool seleccionada:", selected_tool.name)
+
+    if selected_tool.args_schema:
+        tool_args = extract_args(
+            llm=llm,
+            tool=selected_tool,
+            user_input=semantic_text
+        )
+        tool_args = tool_args.dict()
     else:
-        tool_args = raw_args
+        tool_args = semantic_text
 
-    result = tool_wrapper.tool.invoke(tool_args)
-    print("despues executor_node")
-    print(state)
+    print("args extraidos:", tool_args)
+
+    result = selected_tool.tool.invoke(tool_args)
 
     return {
         "results": state["results"] + [result],
         "step_index": i + 1,
         "done": False
     }
-
 
 def answer_node(state: AgentState):
     print("antes answer_node")
