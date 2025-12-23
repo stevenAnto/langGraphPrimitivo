@@ -1,32 +1,36 @@
 # graph/bigtools.py
 
-from typing import Any
-from graph.tools import tavily_tool, wikipedia_tool,suma_tool
+from typing import Any, Optional, Type
+
+from pydantic import BaseModel
+from graph.tools import SumaArgs, tavily_tool, wikipedia_tool,suma_tool
 from dataclasses import dataclass
 
 
 
 @dataclass
 class BigTool:
-    """Contenedor para herramientas con metadata para selección por embeddings"""
     name: str
     description: str
     tool: Any
+    args_schema: Optional[Type[BaseModel]] = None
 
 bigtools = [
     BigTool(
         name="tavily",
-        description="Busca información actualizada en internet, noticias y sitios web",
+        description="Busca información en internet",
         tool=tavily_tool,
+        args_schema=None,       # texto libre
     ),
     BigTool(
         name="wikipedia",
         description="Busca información enciclopédica, definiciones y conceptos",
         tool=wikipedia_tool,
     ),
-        BigTool(
+    BigTool(
         name="suma",
-        description="Realiza operaciones de suma entre dos numeros. Util para calculos matematicos simples de suma",
+        description="Suma dos números",
         tool=suma_tool,
+        args_schema=SumaArgs,   # 🔥 IMPORTANTE
     ),
 ]

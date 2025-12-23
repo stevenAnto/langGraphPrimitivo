@@ -8,7 +8,7 @@ from graph.state import AgentState
 print("API KEY LOADED:", os.getenv("OPENAI_API_KEY") is not None)
 
 initial_state: AgentState = {
-    "user_input": "Busca en internet quien fue Alan Garcia",
+    "user_input": "Dime cuanto es la suma de 5 + 3 y despues puedes buscar en internet quien fue Alan Garcia",
     "plan": None,
     "results": [],
     "final_answer": None

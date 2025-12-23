@@ -1,69 +1,132 @@
+import json
 import re
 from langchain_openai import ChatOpenAI
 from graph.llm import llm
 from graph.state import AgentState
 from graph.router import bigtool_router
+from graph.schemas import ExecutionPlan
+from graph.bigTools_registry import bigtools
 
 
-
-
-def router_node(state: AgentState):
-    """Selecciona y ejecuta la tool usando embeddings (NO LLM para selección)"""
+def planner_node(state):
+    print("antes planer_node ")
+    print(state)
     user_input = state["user_input"]
-    
-    print("\n=== ROUTER NODE - INICIO ===")
-    print(f"User Input: {user_input}")
-    
-    # AQUÍ SE USA EMBEDDINGS (barato) para seleccionar la tool
-    selected_bigtool = bigtool_router.select_tool(user_input)
-    print(f"Tool seleccionada: {selected_bigtool.name}")
-    print(f"Descripcion de la tool: {selected_bigtool.description}")
-    
-    # Ejecutar la tool seleccionada
-    print(f"Ejecutando tool: {selected_bigtool.name}")
-    args = extract_args(llm, selected_bigtool.tool, user_input)
-    tool_result = selected_bigtool.tool.invoke(args.dict()) ## Clave para pasar los arguemtnos adecuados
 
+    tools_description = build_tools_description(bigtools)
 
-    #tool_result = selected_bigtool.tool.invoke({"query": user_input})
-    print(f"Resultado de la tool: {tool_result}")
-    print("=== ROUTER NODE - FIN ===\n")
-    
+    planner_llm = llm.with_structured_output(
+        ExecutionPlan,
+        method="function_calling"
+    )
+
+    plan = planner_llm.invoke(f"""
+You are a planner.
+
+Available tools:
+{tools_description}
+
+Rules:
+- Choose the correct tool
+- args MUST match the argument schema EXACTLY
+- Return JSON only
+
+User request:
+{user_input}
+""")
+
+    print("PLAN PARSED OK:", plan)
+    print("despues plan_node")
+    print(state)
+
     return {
-        "plan": f"Tool seleccionada con embeddings: {selected_bigtool.name}",
-        "results": [tool_result]
+        "plan": plan.steps,
+        "step_index": 0,
+        "results": [],
+        "done": False
+    }
+
+
+def executor_node(state):
+    print("antes executor_node")
+    print(state)
+    plan = state["plan"]
+    i = state["step_index"]
+
+    if i >= len(plan):
+        return {"done": True}
+
+    step = plan[i]
+    tool_wrapper = bigtool_router.get_tool_by_name(step.tool)
+
+    raw_args = step.args
+
+    if isinstance(raw_args, str):
+        try:
+            tool_args = json.loads(raw_args)
+        except json.JSONDecodeError:
+            tool_args = raw_args
+    else:
+        tool_args = raw_args
+
+    result = tool_wrapper.tool.invoke(tool_args)
+    print("despues executor_node")
+    print(state)
+
+    return {
+        "results": state["results"] + [result],
+        "step_index": i + 1,
+        "done": False
     }
 
 
 def answer_node(state: AgentState):
-    """Genera respuesta final (aquí SÍ usamos LLM pero solo una vez)"""
-    user_input = state["user_input"]
-    results = state.get("results", [])
-    
-    print("\n=== ANSWER NODE - INICIO ===")
-    print(f"User Input: {user_input}")
-    print(f"Results recibidos: {results}")
-    
-    if not results:
-        print("No hay resultados disponibles")
-        return {"final_answer": "No encontre informacion relevante."}
-    
-    # Solo UNA llamada al LLM para generar la respuesta final
-    prompt = f"""Responde la pregunta del usuario usando esta informacion:
+    print("antes answer_node")
+    print(state)
+    prompt = f"""
+Usa los siguientes resultados para responder al usuario:
 
-Pregunta: {user_input}
+Pregunta:
+{state["user_input"]}
 
-Informacion:
-{results[0]}
+Resultados:
+{state["results"]}
+"""
 
-Responde de forma clara y concisa."""
-    
-    print("Generando respuesta final con LLM...")
     response = llm.invoke(prompt)
-    print(f"Respuesta generada: {response.content[:200]}...")
-    print("=== ANSWER NODE - FIN ===\n")
-    
+    print("despues answer_node")
+    print(state)
     return {"final_answer": response.content}
+
+
+
+####Funciones auxiliares#######
+
+def build_tools_description(bigtools):
+    blocks = []
+
+    for t in bigtools:
+        if t.args_schema:
+            fields = []
+            for name, field in t.args_schema.model_fields.items():
+                fields.append(
+                    f"- {name}: {field.annotation.__name__}"
+                )
+            args_desc = "\n".join(fields)
+        else:
+            args_desc = "- args: string"
+
+        blocks.append(
+            f"""
+Tool name: {t.name}
+Description: {t.description}
+Arguments:
+{args_desc}
+"""
+        )
+
+    return "\n".join(blocks)
+
 
 
 def extract_args(llm, tool, user_input: str):

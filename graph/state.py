@@ -1,7 +1,8 @@
-from typing import Any, TypedDict, List, Optional
+from typing import Any, Dict, TypedDict, List, Optional
 
-class AgentState(TypedDict, total=False):
+class AgentState(TypedDict):
     user_input: str
-    tool_calls: List[Any]
-    results: list
-    final_answer: str
+    plan: List[Any]
+    step_index: int
+    results: List[Any]
+    done: bool                # condición de salida
