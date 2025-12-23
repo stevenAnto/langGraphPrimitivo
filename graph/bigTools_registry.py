@@ -3,8 +3,22 @@
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel
-from graph.tools import SumaArgs, tavily_tool, wikipedia_tool,suma_tool
+
 from dataclasses import dataclass
+from graph.tools import (
+    SumaArgs,
+    Concat2Args,
+    Concat3Args,
+    JoinArgs,
+    RepeatArgs,
+    suma_tool,
+    concat2_tool,
+    concat3_tool,
+    join_tool,
+    repeat_tool,
+    tavily_tool,
+    wikipedia_tool
+)
 
 
 
@@ -20,7 +34,6 @@ bigtools = [
         name="tavily",
         description="Busca información en internet",
         tool=tavily_tool,
-        args_schema=None,       # texto libre
     ),
     BigTool(
         name="wikipedia",
@@ -31,6 +44,30 @@ bigtools = [
         name="suma",
         description="Suma dos números",
         tool=suma_tool,
-        args_schema=SumaArgs,   # 🔥 IMPORTANTE
+        args_schema=SumaArgs,
+    ),
+    BigTool(
+        name="concat_2",
+        description="Concatena dos palabras o textos",
+        tool=concat2_tool,
+        args_schema=Concat2Args,
+    ),
+    BigTool(
+        name="concat_3",
+        description="Concatena tres palabras o textos",
+        tool=concat3_tool,
+        args_schema=Concat3Args,
+    ),
+    BigTool(
+        name="join_words",
+        description="Une varias palabras con un separador",
+        tool=join_tool,
+        args_schema=JoinArgs,
+    ),
+    BigTool(
+        name="repeat_word",
+        description="Repite una palabra varias veces",
+        tool=repeat_tool,
+        args_schema=RepeatArgs,
     ),
 ]
